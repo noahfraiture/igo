@@ -40,17 +40,17 @@ func (o KittyImgOpts) ToHeader(opts ...string) string {
 		code rune
 	}
 	sFld := []fldmap{
-		fldmap{&o.SrcX, 'x'},
-		fldmap{&o.SrcY, 'y'},
-		fldmap{&o.SrcWidth, 'w'},
-		fldmap{&o.SrcHeight, 'h'},
-		fldmap{&o.CellOffsetX, 'X'},
-		fldmap{&o.CellOffsetY, 'Y'},
-		fldmap{&o.DstCols, 'c'},
-		fldmap{&o.DstRows, 'r'},
-		fldmap{&o.ImageId, 'i'},
-		fldmap{&o.ImageNo, 'I'},
-		fldmap{&o.PlacementId, 'p'},
+		{&o.SrcX, 'x'},
+		{&o.SrcY, 'y'},
+		{&o.SrcWidth, 'w'},
+		{&o.SrcHeight, 'h'},
+		{&o.CellOffsetX, 'X'},
+		{&o.CellOffsetY, 'Y'},
+		{&o.DstCols, 'c'},
+		{&o.DstRows, 'r'},
+		{&o.ImageId, 'i'},
+		{&o.ImageNo, 'I'},
+		{&o.PlacementId, 'p'},
 	}
 
 	for _, f := range sFld {
@@ -121,16 +121,16 @@ func KittyCopyPNGInline(out io.Writer, in io.Reader, opts KittyImgOpts) error {
 
 	// PIPELINE: PNG (io.Reader) -> B64 -> CHUNKER -> (io.Writer)
 	// SEND IN 4K CHUNKS
-	cw := kittyChunkWri{
-		nChunkSize: 4096,
-		iWri:       out,
+	chunk := kittyChunk{
+		chunkSize: 4096,
+		writer:    out,
 	}
 
-	enc64 := base64.NewEncoder(base64.StdEncoding, &cw)
+	enc64 := base64.NewEncoder(base64.StdEncoding, &chunk)
 	_, err = io.Copy(enc64, in)
 	return errors.Join(
 		err,
 		enc64.Close(),
-		cw.Close(),
+		chunk.Close(),
 	)
 }
