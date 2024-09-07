@@ -8,6 +8,7 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"testing"
@@ -112,7 +113,8 @@ func testImage(iWri io.Writer, fpath, mode string) error {
 			eI := KittyWritePngReader(iWri, fIn, KittyImgOpts{})
 			err = errors.Join(eI, eF)
 		case "gif":
-			// TODO : call animation frame
+			fmt.Println("Kitty GIF Inline")
+			err = KittyWriteGIF(iWri, fIn, KittyImgOpts{ImageId: rand.Uint32()})
 		default:
 			err = KittyWriteImage(iWri, iImg, KittyImgOpts{})
 		}
