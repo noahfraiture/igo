@@ -104,16 +104,16 @@ func testImage(iWri io.Writer, fpath, mode string) error {
 
 	case "kitty":
 
-		if fmtName == "png" {
-
+		switch fmtName {
+		case "png":
 			fmt.Println("Kitty PNG Local File")
 			eF := KittyWritePNGLocal(iWri, fpath, KittyImgOpts{})
 			fmt.Println("\nKitty PNG Inline")
-			eI := KittyCopyPNGInline(iWri, fIn, KittyImgOpts{})
+			eI := KittyWritePngReader(iWri, fIn, KittyImgOpts{})
 			err = errors.Join(eI, eF)
-
-		} else {
-
+		case "gif":
+			// TODO : call animation frame
+		default:
 			err = KittyWriteImage(iWri, iImg, KittyImgOpts{})
 		}
 	}

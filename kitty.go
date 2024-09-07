@@ -108,11 +108,11 @@ func KittyWriteImage(out io.Writer, iImg image.Image, opts KittyImgOpts) error {
 		return E
 	}
 
-	return KittyCopyPNGInline(out, pBuf, opts)
+	return KittyWritePngReader(out, pBuf, opts)
 }
 
 // Serialize PNG image from io.Reader into Kitty terminal in-band format.
-func KittyCopyPNGInline(out io.Writer, in io.Reader, opts KittyImgOpts) error {
+func KittyWritePngReader(out io.Writer, in io.Reader, opts KittyImgOpts) error {
 
 	_, err := fmt.Fprint(out, opts.ToHeader("a=T", "f=100", "t=d", "m=1"), KITTY_IMG_FTR)
 	if err != nil {
@@ -133,4 +133,22 @@ func KittyCopyPNGInline(out io.Writer, in io.Reader, opts KittyImgOpts) error {
 		enc64.Close(),
 		chunk.Close(),
 	)
+}
+
+func KittyClean(out io.Writer, opts KittyImgOpts) error {
+	// Remove the image
+	_, err := fmt.Fprint(out, opts.ToHeader("a=d", "d=a"), KITTY_IMG_FTR)
+	if err != nil {
+		return err
+	}
+
+	// Clear the affected terminal lines
+	_, err = fmt.Fprint(out, "\033[2J") // Clear the entire screen
+	if err != nil {
+		return err
+	}
+
+	// Optionally, reset the cursor position if needed
+	_, err = fmt.Fprint(out, "\033[H") // Move cursor to home position (top-left)
+	return err
 }
