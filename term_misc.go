@@ -1,4 +1,4 @@
-package rasterm
+package igo
 
 import (
 	"errors"
