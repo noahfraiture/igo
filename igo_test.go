@@ -196,3 +196,19 @@ func TestKitty(pT *testing.T) {
 		pT.Fatal(E)
 	}
 }
+
+func TestGif(pT *testing.T) {
+
+	out := os.Stdout
+	file, err := os.Open("test_images/house.gif")
+
+	if err != nil {
+		pT.Fatal(err)
+	}
+	defer file.Close()
+
+	err = KittyWriteGIF(out, file, KittyImgOpts{ImageId: rand.Uint32()})
+	if err != nil {
+		pT.Fatal(err)
+	}
+}
