@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"image/draw"
 	"image/gif"
 	"image/png"
 	"io"
@@ -13,22 +14,22 @@ import (
 
 // Serialize GIF image into Kitty terminal in-band format.
 func KittyWriteGIF(out io.Writer, gifReader io.Reader, opts KittyImgOpts) error {
-	frames, delays := DecodeGIF(gifReader)
-	if frames == nil {
+	frames, x, y, err := splitAnimatedGIF(gifReader)
+	if err != nil {
 		return errors.New("failed to decode GIF")
 	}
 
-	opts.SrcHeight = uint32(frames[0].Bounds().Dx())
-	opts.SrcWidth = uint32(frames[0].Bounds().Dy())
+	opts.SrcHeight = y
+	opts.SrcWidth = x
 
 	// Use the first frame as the base image
-	if err := KittyWriteImage(out, frames[0], opts); err != nil {
+	if err := KittyWriteImage(out, &frames[0], opts); err != nil {
 		return err
 	}
 
 	// Write each frame with appropriate frame numbers
-	for i, frame := range frames[1:] {
-		if err := KittyWriteFrame(out, frame, opts, delays[i]); err != nil {
+	for _, frame := range frames[1:] {
+		if err := kittyWriteFrame(out, &frame, opts); err != nil {
 			return err
 		}
 	}
@@ -39,24 +40,54 @@ func KittyWriteGIF(out io.Writer, gifReader io.Reader, opts KittyImgOpts) error 
 	// return KittyControlAnimation(out, opts, delays)
 }
 
-func DecodeGIF(r io.Reader) ([]image.Image, []int) {
-	img, err := gif.DecodeAll(r)
+// Decode reads and analyzes the given reader as a GIF image
+func splitAnimatedGIF(reader io.Reader) ([]image.RGBA, uint32, uint32, error) {
+	gif, err := gif.DecodeAll(reader)
+
 	if err != nil {
-		fmt.Println("Error decoding GIF:", err)
-		return nil, nil
+		return nil, 0, 0, err
 	}
 
-	frames := make([]image.Image, len(img.Image))
-	delays := make([]int, len(img.Delay))
-	for i, frame := range img.Image {
-		frames[i] = frame
-		delays[i] = img.Delay[i]
+	imgs := make([]image.RGBA, len(gif.Image))
+
+	imgWidth, imgHeight := getGifDimensions(gif)
+
+	overpaintImage := image.NewRGBA(image.Rect(0, 0, imgWidth, imgHeight))
+	draw.Draw(overpaintImage, overpaintImage.Bounds(), gif.Image[0], image.ZP, draw.Src)
+
+	for _, srcImg := range gif.Image {
+		draw.Draw(overpaintImage, overpaintImage.Bounds(), srcImg, image.ZP, draw.Over)
+		imgs = append(imgs, *overpaintImage)
 	}
 
-	return frames, delays
+	return imgs, uint32(imgWidth), uint32(imgHeight), nil
 }
 
-func KittyWriteFrame(out io.Writer, frame image.Image, opts KittyImgOpts, delay int) error {
+func getGifDimensions(gif *gif.GIF) (x, y int) {
+	var lowestX int
+	var lowestY int
+	var highestX int
+	var highestY int
+
+	for _, img := range gif.Image {
+		if img.Rect.Min.X < lowestX {
+			lowestX = img.Rect.Min.X
+		}
+		if img.Rect.Min.Y < lowestY {
+			lowestY = img.Rect.Min.Y
+		}
+		if img.Rect.Max.X > highestX {
+			highestX = img.Rect.Max.X
+		}
+		if img.Rect.Max.Y > highestY {
+			highestY = img.Rect.Max.Y
+		}
+	}
+
+	return highestX - lowestX, highestY - lowestY
+}
+
+func kittyWriteFrame(out io.Writer, frame image.Image, opts KittyImgOpts) error {
 	// Ensure width and height are properly set
 	if frame.Bounds().Dx() == 0 || frame.Bounds().Dy() == 0 {
 		return errors.New("frame width or height is zero")
@@ -69,7 +100,7 @@ func KittyWriteFrame(out io.Writer, frame image.Image, opts KittyImgOpts, delay 
 		fmt.Sprintf("s=%d", opts.SrcWidth),
 		fmt.Sprintf("v=%d", opts.SrcHeight),
 		fmt.Sprintf("i=%d", opts.ImageId),
-		fmt.Sprintf("z=%d", delay*10),
+		fmt.Sprintf("z=%d", 1000),
 	}
 	fmt.Println(headerOpts)
 
@@ -97,7 +128,7 @@ func KittyWriteFrame(out io.Writer, frame image.Image, opts KittyImgOpts, delay 
 	)
 }
 
-func KittyControlAnimation(out io.Writer, opts KittyImgOpts, delays []int) error {
+func kittyControlAnimation(out io.Writer, opts KittyImgOpts, delays []int) error {
 	// Set animation control options, such as looping
 	headersOpts := []string{
 		"a=a",
