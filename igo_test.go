@@ -200,7 +200,7 @@ func TestKitty(pT *testing.T) {
 func TestGif(pT *testing.T) {
 
 	out := os.Stdout
-	file, err := os.Open("test_images/house.gif")
+	file, err := os.Open("test_images/gif.gif")
 
 	if err != nil {
 		pT.Fatal(err)

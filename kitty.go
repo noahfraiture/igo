@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"image/gif"
 	"image/png"
 	"io"
 	"strings"
+	"time"
 )
 
 // See https://sw.kovidgoyal.net/kitty/graphics-protocol.html for more details.
@@ -133,6 +135,55 @@ func KittyWritePngReader(out io.Writer, in io.Reader, opts KittyImgOpts) error {
 		enc64.Close(),
 		chunk.Close(),
 	)
+}
+
+// Serialize GIF image into Kitty terminal in-band format.
+func KittyWriteGIF(out io.Writer, gifReader io.Reader, opts KittyImgOpts) error {
+	frames, delays := DecodeGIF(gifReader)
+	if frames == nil {
+		return errors.New("failed to decode GIF")
+	}
+
+	i := 0
+	loop := 5
+	for {
+		if err := KittyWriteImage(out, frames[i], opts); err != nil {
+			return err
+		}
+
+		time.Sleep(time.Duration(delays[i]) * time.Millisecond)
+		fmt.Println(delays[i])
+		if err := KittyClean(out, opts); err != nil {
+			return err
+		}
+
+		i = (i + 1) % len(frames)
+		if i == 0 {
+			loop -= 1
+		}
+		if loop == 0 {
+			break
+		}
+
+	}
+	return nil
+}
+
+func DecodeGIF(r io.Reader) ([]image.Image, []int) {
+	img, err := gif.DecodeAll(r)
+	if err != nil {
+		fmt.Println("Error decoding GIF:", err)
+		return nil, nil
+	}
+
+	frames := make([]image.Image, len(img.Image))
+	delays := make([]int, len(img.Delay))
+	for i, frame := range img.Image {
+		frames[i] = frame
+		delays[i] = img.Delay[i]
+	}
+
+	return frames, delays
 }
 
 func KittyClean(out io.Writer, opts KittyImgOpts) error {
